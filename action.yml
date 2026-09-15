@@ -1,0 +1,181 @@
+name: 'Open Java Format Check'
+description: 'Checks Java code formatting with the open-java-format native binary'
+author: 'abashev'
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  version:
+    description: 'Version of open-java-format to use'
+    required: true
+    default: '2.98.0.1'
+  mode:
+    description: 'Which files to check: "changed" for files from PR/push, "all" for every .java file'
+    required: false
+    default: 'changed'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect platform
+      id: platform
+      shell: bash
+      run: |
+        OS=$(uname -s)
+        ARCH=$(uname -m)
+
+        case "${OS}-${ARCH}" in
+          Linux-x86_64)  SUFFIX="linux-glibc_x86-64" ;;
+          Linux-aarch64) SUFFIX="linux-glibc_aarch64" ;;
+          Darwin-arm64)  SUFFIX="macos_aarch64" ;;
+          Darwin-x86_64) SUFFIX="macos_x86-64" ;;
+          *)
+            echo "::error::No open-java-format native binary for ${OS}-${ARCH}. Supported: Linux x86_64, Linux aarch64, macOS aarch64, macOS x86_64."
+            exit 1
+            ;;
+        esac
+
+        echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
+
+    - name: Check for newer open-java-format version
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        VERSION="${{ inputs.version }}"
+
+        # Best-effort version check — must never fail the build. The GitHub API
+        # returns 403 for unauthenticated CI requests (rate limit), so authenticate
+        # with the job token when available and tolerate any failure.
+        AUTH=()
+        if [ -n "${GH_TOKEN:-}" ]; then
+          AUTH=(-H "Authorization: Bearer $GH_TOKEN")
+        fi
+
+        LATEST=$(curl -sSL "${AUTH[@]}" -H "Accept: application/vnd.github+json" \
+          https://api.github.com/repos/openjavaformat/open-java-format/releases/latest 2>/dev/null \
+          | jq -r '.tag_name // empty' 2>/dev/null || true)
+
+        if [ -z "$LATEST" ]; then
+          echo "Could not check the latest open-java-format version — skipping this check."
+        elif [ "$LATEST" != "$VERSION" ]; then
+          echo "::warning::A newer open-java-format version is available: $LATEST (you are using $VERSION)"
+        fi
+
+    - name: Cache open-java-format binary
+      id: cache
+      uses: actions/cache@v6
+      with:
+        path: ${{ github.action_path }}/open-java-format
+        key: open-java-format-${{ inputs.version }}-${{ steps.platform.outputs.suffix }}
+
+    - name: Download open-java-format native binary
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        SUFFIX="${{ steps.platform.outputs.suffix }}"
+        BASE_URL="https://repo1.maven.org/maven2/dev/openjavaformat/open-java-format-native/${VERSION}"
+        ARTIFACT="open-java-format-native-${VERSION}-nativeImage-${SUFFIX}.bin"
+        DOWNLOAD_URL="${BASE_URL}/${ARTIFACT}"
+        BINARY="${{ github.action_path }}/open-java-format"
+
+        echo "Downloading open-java-format ${VERSION} (${SUFFIX})..."
+        if ! curl -sSfL -o "$BINARY" "$DOWNLOAD_URL"; then
+          rm -f "$BINARY"
+          echo "::error::Failed to download open-java-format from: $DOWNLOAD_URL"
+          exit 1
+        fi
+
+        chmod +x "$BINARY"
+
+    - name: Set binary path
+      shell: bash
+      run: echo "OJF_BINARY=${{ github.action_path }}/open-java-format" >> "$GITHUB_ENV"
+
+    - name: Collect files to check
+      shell: bash
+      run: |
+        MODE="${{ inputs.mode }}"
+
+        if [ "$MODE" = "all" ]; then
+          echo "Mode: all — checking every .java file"
+          FILES=$(find . -name '*.java' -not -path './.git/*' | sed 's|^\./||' | tr '\n' ' ')
+        elif [ -n "${{ github.event.pull_request.number }}" ]; then
+          echo "Mode: changed (PR #${{ github.event.pull_request.number }})"
+          FILES=$(gh pr diff ${{ github.event.pull_request.number }} --name-only | { grep '\.java$' || true; } | tr '\n' ' ')
+        elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+          echo "Mode: changed (push ${{ github.event.before }}...${{ github.sha }})"
+          FILES=$(git diff --name-only --diff-filter=ACMR ${{ github.event.before }}...${{ github.sha }} -- '*.java' | tr '\n' ' ')
+        else
+          echo "Mode: changed — unknown event, falling back to all .java files"
+          FILES=$(find . -name '*.java' -not -path './.git/*' | sed 's|^\./||' | tr '\n' ' ')
+        fi
+
+        # Drop files matching patterns in .open-java-format-exclude (repo root), if present.
+        # Each non-empty, non-comment line is a git pathspec (relative to the repo root).
+        # This file is the single source of exclusions, shared with the pre-commit hook.
+        EXCLUDE_FILE=".open-java-format-exclude"
+        if [ -n "$FILES" ] && [ -f "$EXCLUDE_FILE" ]; then
+          PATTERNS=()
+          while IFS= read -r line || [ -n "$line" ]; do
+            line="${line#"${line%%[![:space:]]*}"}"
+            line="${line%"${line##*[![:space:]]}"}"
+            case "$line" in ''|\#*) continue ;; esac
+            PATTERNS+=("$line")
+          done < "$EXCLUDE_FILE"
+
+          if [ ${#PATTERNS[@]} -gt 0 ]; then
+            EXCLUDED=$(git ls-files --cached --others --exclude-standard -- "${PATTERNS[@]}" 2>/dev/null || true)
+            if [ -n "$EXCLUDED" ]; then
+              echo "Excluding files matching $EXCLUDE_FILE:"
+              printf '%s\n' "$EXCLUDED" | sed 's/^/  /'
+              FILES=$(printf '%s\n' $FILES | grep -vxFf <(printf '%s\n' "$EXCLUDED") | tr '\n' ' ' || true)
+            fi
+          fi
+        fi
+
+        if [ -z "$FILES" ]; then
+          echo "No Java files to check."
+          echo "OJF_FILES=" >> "$GITHUB_ENV"
+        else
+          echo "Files to check:"
+          echo "$FILES" | tr ' ' '\n' | grep -v '^$'
+          echo "OJF_FILES=$FILES" >> "$GITHUB_ENV"
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Run format check
+      shell: bash
+      run: |
+        if [ -z "$OJF_FILES" ]; then
+          echo "Nothing to check, skipping."
+          exit 0
+        fi
+
+        UNFORMATTED=()
+        for FILE in $OJF_FILES; do
+          if [ -f "$FILE" ]; then
+            if ! "$OJF_BINARY" --ojf --dry-run --set-exit-if-changed "$FILE" > /dev/null 2>&1; then
+              UNFORMATTED+=("$FILE")
+            fi
+          fi
+        done
+
+        if [ ${#UNFORMATTED[@]} -gt 0 ]; then
+          echo "::error::Java formatting issues found!"
+          echo ""
+          echo "The following files are not formatted correctly:"
+          for FILE in "${UNFORMATTED[@]}"; do
+            echo "  $FILE"
+          done
+          echo ""
+          echo "Run open-java-format locally to fix:"
+          echo "  open-java-format --ojf --replace ${UNFORMATTED[*]}"
+          exit 1
+        fi
+
+        echo "All files are correctly formatted."

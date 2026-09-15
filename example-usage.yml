@@ -1,0 +1,21 @@
+name: Java Format Check
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  format-check:
+    name: Check Java formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check formatting
+        uses: openjavaformat/open-java-format-action@v1
+        with:
+          version: '2.98.0.1'
+          mode: ${{ github.event_name == 'push' && 'all' || 'changed' }}
