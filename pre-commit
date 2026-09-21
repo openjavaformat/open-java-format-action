@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FORMATTER_VERSION="2.98.0.1"
+FORMATTER_VERSION="2.98.0.2"
 CACHE_DIR="${HOME}/.cache/open-java-format"
-BINARY="${CACHE_DIR}/open-java-format-${FORMATTER_VERSION}"
 BASE_URL="https://repo1.maven.org/maven2/dev/openjavaformat/open-java-format-native/${FORMATTER_VERSION}"
+
+# The Windows binary is an .exe, on Maven Central and on disk.
+case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*) EXTENSION="exe"; EXE=".exe" ;;
+    *) EXTENSION="bin"; EXE="" ;;
+esac
+BINARY="${CACHE_DIR}/open-java-format-${FORMATTER_VERSION}${EXE}"
 
 # Read exclude patterns from .open-java-format-exclude (repo root), if present.
 # Each non-empty, non-comment line is a git pathspec whose matches are skipped.
@@ -41,14 +47,15 @@ if [ ! -x "$BINARY" ]; then
         Linux-aarch64) SUFFIX="linux-glibc_aarch64" ;;
         Darwin-arm64)  SUFFIX="macos_aarch64" ;;
         Darwin-x86_64) SUFFIX="macos_x86-64" ;;
+        MINGW*-x86_64 | MSYS*-x86_64 | CYGWIN*-x86_64) SUFFIX="windows_x86-64" ;;
         *)
             echo "ERROR: No open-java-format native binary for ${OS}-${ARCH}."
-            echo "       Supported: Linux x86_64, Linux aarch64, macOS aarch64, macOS x86_64."
+            echo "       Supported: Linux x86_64, Linux aarch64, macOS aarch64, macOS x86_64, Windows x86_64."
             exit 1
             ;;
     esac
 
-    ARTIFACT="open-java-format-native-${FORMATTER_VERSION}-nativeImage-${SUFFIX}.bin"
+    ARTIFACT="open-java-format-native-${FORMATTER_VERSION}-nativeImage-${SUFFIX}.${EXTENSION}"
     DOWNLOAD_URL="${BASE_URL}/${ARTIFACT}"
 
     echo "Downloading open-java-format ${FORMATTER_VERSION} (${SUFFIX})..."
@@ -68,7 +75,7 @@ fi
 UNFORMATTED=()
 for FILE in $STAGED_FILES; do
     if [ -f "$FILE" ]; then
-        if ! "$BINARY" --ojf --dry-run --set-exit-if-changed "$FILE" > /dev/null 2>&1; then
+        if ! "$BINARY" --dry-run --set-exit-if-changed "$FILE" > /dev/null 2>&1; then
             UNFORMATTED+=("$FILE")
         fi
     fi
@@ -84,7 +91,7 @@ if [ ${#UNFORMATTED[@]} -gt 0 ]; then
     echo ""
     echo "Run the following command to fix:"
     echo ""
-    echo "  $BINARY --ojf --replace ${UNFORMATTED[*]}"
+    echo "  $BINARY --replace ${UNFORMATTED[*]}"
     echo ""
     exit 1
 fi

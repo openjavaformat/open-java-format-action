@@ -14,15 +14,57 @@ jobs:
           fetch-depth: 0
       - uses: ./
         with:
-          version: '2.98.0.1'
+          version: '2.98.0.2'
           mode: changed
 
-  test-all:
-    name: Test mode=all
-    runs-on: ubuntu-latest
+  # The action and the hook on every platform they support, with a file that is formatted and one that
+  # is not. The repository itself has no Java files, so the tests write their own.
+  test-platforms:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel, windows-latest]
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
-      - uses: ./
+
+      - name: Write a formatted file
+        run: printf 'class Formatted {\n    int x;\n}\n' > Formatted.java
+
+      - name: Check it
+        uses: ./
         with:
-          version: '2.98.0.1'
+          version: '2.98.0.2'
           mode: all
+
+      - name: Write a file that is not formatted
+        run: printf 'class Unformatted{int x;}\n' > Unformatted.java
+
+      - name: Check it, expecting a failure
+        id: unformatted
+        continue-on-error: true
+        uses: ./
+        with:
+          version: '2.98.0.2'
+          mode: all
+
+      - name: Make sure the check failed
+        run: test "${{ steps.unformatted.outcome }}" = failure
+
+      - name: Run the pre-commit hook on a file that is not formatted, then on a formatted one
+        run: |
+          git init -q hook-test
+          cd hook-test
+          printf 'class Hook{int x;}\n' > Hook.java
+          git add Hook.java
+          if bash ../pre-commit; then
+            echo "::error::The hook accepted a file that is not formatted"
+            exit 1
+          fi
+          printf 'class Hook {\n    int x;\n}\n' > Hook.java
+          git add Hook.java
+          bash ../pre-commit

@@ -9,16 +9,18 @@ No Java, Maven, or Gradle required — downloads a native binary from Maven Cent
 ```yaml
 - uses: actions/checkout@v7
 
-- uses: openjavaformat/open-java-format-action@v1
+- uses: openjavaformat/open-java-format-action@v2
   with:
-    version: '2.98.0.1'
+    version: '2.98.0.2'
 ```
+
+v2 is for open-java-format 2.98.0.2 and later, which has a single style. A workflow that pins 2.98.0.1 stays on `@v1`, which passes that version the `--ojf` flag it needs.
 
 ## Inputs
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `version` | yes | `2.98.0.1` | Version of the open-java-format native binary, one of those on [Maven Central](https://repo1.maven.org/maven2/dev/openjavaformat/open-java-format-native/) |
+| `version` | yes | `2.98.0.2` | Version of the open-java-format native binary, one of those on [Maven Central](https://repo1.maven.org/maven2/dev/openjavaformat/open-java-format-native/) |
 | `mode` | no | `changed` | `changed` — only files from PR or push; `all` — every `.java` file in repo |
 
 ## How `mode: changed` works
@@ -32,12 +34,12 @@ No Java, Maven, or Gradle required — downloads a native binary from Maven Cent
 - If all files are formatted correctly → passes ✅
 - If any file has formatting issues → lists unformatted files and fails ❌
 
-Files are checked in the open-java-format style, `--ojf` (formerly `--palantir`). When the check fails, fix locally with a native binary or the runnable jar from the [open-java-format releases](https://github.com/openjavaformat/open-java-format/releases):
+Files are checked in the open-java-format style, the formatter's only style. When the check fails, fix locally with a native binary or the runnable jar from the [open-java-format releases](https://github.com/openjavaformat/open-java-format/releases):
 
 ```bash
-open-java-format --ojf --replace <files>
+open-java-format --replace <files>
 # or, with Java 21 or later
-java -jar open-java-format-2.98.0.1-all.jar --ojf --replace <files>
+java -jar open-java-format-2.98.0.2-all.jar --replace <files>
 ```
 
 ## Excluding files
@@ -78,9 +80,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: openjavaformat/open-java-format-action@v1
+      - uses: openjavaformat/open-java-format-action@v2
         with:
-          version: '2.98.0.1'
+          version: '2.98.0.2'
           mode: ${{ github.event_name == 'push' && 'all' || 'changed' }}
 ```
 
@@ -107,5 +109,6 @@ The hook pins its own formatter version in `FORMATTER_VERSION` at the top of the
 - Linux aarch64 (glibc)
 - macOS aarch64 (Apple Silicon)
 - macOS x86_64 (Intel)
+- Windows x86_64
 
-There is no native binary for Windows or for musl-based Linux such as Alpine.
+There is no native binary for Windows on ARM or for musl-based Linux such as Alpine.

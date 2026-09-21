@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Check formatting
-        uses: openjavaformat/open-java-format-action@v1
+        uses: openjavaformat/open-java-format-action@v2
         with:
-          version: '2.98.0.1'
+          version: '2.98.0.2'
           mode: ${{ github.event_name == 'push' && 'all' || 'changed' }}
