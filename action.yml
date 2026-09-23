@@ -10,7 +10,7 @@ inputs:
   version:
     description: 'Version of open-java-format to use'
     required: true
-    default: '2.98.0.2'
+    default: '2.98.0.3'
   mode:
     description: 'Which files to check: "changed" for files from PR/push, "all" for every .java file'
     required: false
