@@ -11,7 +11,7 @@ No Java, Maven, or Gradle required — downloads a native binary from Maven Cent
 
 - uses: openjavaformat/open-java-format-action@v2
   with:
-    version: '2.98.0.3'
+    version: '2.98.0.4'
 ```
 
 v2 is for open-java-format 2.98.0.2 and later, which has a single style. A workflow that pins 2.98.0.1 stays on `@v1`, which passes that version the `--ojf` flag it needs.
@@ -20,7 +20,7 @@ v2 is for open-java-format 2.98.0.2 and later, which has a single style. A workf
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `version` | yes | `2.98.0.3` | Version of the open-java-format native binary, one of those on [Maven Central](https://repo1.maven.org/maven2/dev/openjavaformat/open-java-format-native/) |
+| `version` | yes | `2.98.0.4` | Version of the open-java-format native binary, one of those on [Maven Central](https://repo1.maven.org/maven2/dev/openjavaformat/open-java-format-native/) |
 | `mode` | no | `changed` | `changed` — only files from PR or push; `all` — every `.java` file in repo |
 
 ## How `mode: changed` works
@@ -39,7 +39,7 @@ Files are checked in the open-java-format style, the formatter's only style. Whe
 ```bash
 open-java-format --replace <files>
 # or, with Java 21 or later
-java -jar open-java-format-2.98.0.3-all.jar --replace <files>
+java -jar open-java-format-2.98.0.4-all.jar --replace <files>
 ```
 
 ## Excluding files
@@ -82,7 +82,7 @@ jobs:
 
       - uses: openjavaformat/open-java-format-action@v2
         with:
-          version: '2.98.0.3'
+          version: '2.98.0.4'
           mode: ${{ github.event_name == 'push' && 'all' || 'changed' }}
 ```
 

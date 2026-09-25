@@ -14,7 +14,7 @@ jobs:
           fetch-depth: 0
       - uses: ./
         with:
-          version: '2.98.0.3'
+          version: '2.98.0.4'
           mode: changed
 
   # The action and the hook on every platform they support, with a file that is formatted and one that
@@ -38,7 +38,7 @@ jobs:
       - name: Check it
         uses: ./
         with:
-          version: '2.98.0.3'
+          version: '2.98.0.4'
           mode: all
 
       - name: Write a file that is not formatted
@@ -49,7 +49,7 @@ jobs:
         continue-on-error: true
         uses: ./
         with:
-          version: '2.98.0.3'
+          version: '2.98.0.4'
           mode: all
 
       - name: Make sure the check failed
