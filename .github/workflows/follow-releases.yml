@@ -1,0 +1,59 @@
+name: Follow open-java-format releases
+
+# The action, the pre-commit hook, the CI and the README name one open-java-format version, and
+# .open-java-format-version holds it. Once an hour this compares that file with the latest release of
+# openjavaformat/open-java-format. When a new release is out, the version is replaced in every file
+# that names it, the result is pushed to main, and Test Action is run on it. That run has to be
+# explicit: a push made with the workflow's own token starts no push-triggered workflow.
+
+on:
+  schedule:
+    - cron: '17 * * * *' # not on the hour, when GitHub's schedule queue is longest
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  bump:
+    name: Bump to the latest release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push to main
+      actions: write # run Test Action
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Bump when a new release is out
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(cat .open-java-format-version)
+          release=$(gh release view --repo openjavaformat/open-java-format --json tagName,publishedAt)
+          latest=$(jq -r .tagName <<< "$release")
+          published=$(jq -r '.publishedAt[:10]' <<< "$release")
+          if [ "$latest" = "$current" ]; then
+            echo "Already on $current."
+            exit 0
+          fi
+
+          # Every file that names the current version names it as the current one. The dots are
+          # escaped so that sed takes them literally.
+          git grep -lF -- "$current" | xargs sed -i "s/${current//./\\.}/$latest/g"
+          git diff
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --all --quiet --file - <<COMMIT
+          Check with open-java-format $latest
+
+          The action, the pre-commit hook and the CI default to $latest, which
+          openjavaformat/open-java-format released on $published. Made by the
+          "$GITHUB_WORKFLOW" workflow:
+          $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          COMMIT
+          gh auth setup-git
+          git push origin HEAD:main
+          gh workflow run ci.yml --ref main

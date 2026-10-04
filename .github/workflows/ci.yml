@@ -3,6 +3,7 @@ name: Test Action
 on:
   push:
   pull_request:
+  workflow_dispatch: # Follow open-java-format releases runs this on the bump it pushes
 
 jobs:
   test-changed:
