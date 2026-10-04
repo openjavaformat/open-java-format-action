@@ -1,6 +1,6 @@
 name: Follow open-java-format releases
 
-# The action, the pre-commit hook, the CI and the README name one open-java-format version, and
+# The action, the pre-commit hook and the README name one open-java-format version, and
 # .open-java-format-version holds it. Once an hour this compares that file with the latest release of
 # openjavaformat/open-java-format. When a new release is out, the version is replaced in every file
 # that names it, the result is pushed to main, and Test Action is run on it. That run has to be
@@ -49,7 +49,7 @@ jobs:
           git commit --all --quiet --file - <<COMMIT
           Check with open-java-format $latest
 
-          The action, the pre-commit hook and the CI default to $latest, which
+          The action and the pre-commit hook default to $latest, which
           openjavaformat/open-java-format released on $published. Made by the
           "$GITHUB_WORKFLOW" workflow:
           $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
