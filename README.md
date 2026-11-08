@@ -9,7 +9,7 @@ No Java, Maven, or Gradle required — downloads a native binary from Maven Cent
 The version of open-java-format to check with goes in `.open-java-format-version` at the repository root, one of the versions on [Maven Central](https://repo1.maven.org/maven2/dev/openjavaformat/open-java-format-native/):
 
 ```
-21.0.1
+21.0.2
 ```
 
 The action and the [pre-commit hook](#git-pre-commit-hook) both read that file, so the two cannot drift apart; without it, both stop and ask for it. The action itself needs no inputs:
@@ -47,7 +47,7 @@ Files are checked in the open-java-format style, the formatter's only style. Whe
 ```bash
 open-java-format --replace <files>
 # or, with Java 21 or later
-java -jar open-java-format-21.0.1-all.jar --replace <files>
+java -jar open-java-format-21.0.2-all.jar --replace <files>
 ```
 
 ## Excluding files
